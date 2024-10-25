@@ -205,12 +205,3 @@ async function runCLI() {
 // Run the CLI
 runCLI().catch((err) => console.error('Error:', err));
 
-"devDependencies": {
-    "@types/bun": "latest"
-},
-"peerDependencies": {
-    "typescript": "^5.0.0"
-},
-"dependencies": {
-    "inquirer": "^12.0.0"
-}
