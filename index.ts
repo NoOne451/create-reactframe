@@ -5,7 +5,6 @@ import path from 'path';
 import { writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import ora from 'ora';
-import { stdout } from 'bun';
 
 // Bun does not require checking for the environment
 // since this script is executed in Bun
