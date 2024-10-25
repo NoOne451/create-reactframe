@@ -5,8 +5,7 @@
   "type": "module",
   "module": "index.ts",
   "bin": {
-    "@noone451/create-reactframe": "./index.ts",
-    "create-reactframe": "./index.ts"
+    "@noone451/create-reactframe": "./index.ts"
   },
   "files": [
     "index.ts",
@@ -51,5 +50,10 @@
   "homepage": "https://github.com/noone451/create-reactframe#readme",
   "publishConfig": {
     "access": "public"
+  },
+  "scripts": {
+    "dev": "bun index.ts",
+    "build": "bun build index.ts",
+    "test": "bun test"
   }
 }

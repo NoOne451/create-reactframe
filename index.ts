@@ -1,122 +1,97 @@
 #!/usr/bin/env bun
+
 import inquirer from 'inquirer';
-import { spawn } from 'bun';
-import { writeFile } from 'fs/promises';
 import path from 'path';
-import { unlink } from 'fs/promises';
+import { writeFile, unlink } from 'fs/promises';
 import { existsSync } from 'fs';
 import ora from 'ora';
-import chalk from 'chalk';
+import { stdout } from 'bun';
 
-// Function to determine runtime
-const isBun = process.argv[0].includes('bunx');
-const packageManager = isBun ? 'bun' : 'npm';
-const packageRunner = isBun ? 'bunx' : 'npx';
+// Bun does not require checking for the environment
+// since this script is executed in Bun
 
-console.log(`Running with ${isBun ? 'Bun' : 'Node'}`);
+async function spawnProcess(command: string[], options: any = {}): Promise<void> {
+    const process = Bun.spawn(command, {
+        ...options,
 
-// Function to create React app
-export async function createViteApp(projectName: string) {
-
-    const process_1 = spawn([packageManager, 'create', 'vite', projectName, '--template', 'react-ts'], {
-        stdout: 'ignore',
-        stderr: 'inherit',
+        stdout: "ignore"
     });
 
-    await process_1.exited;
-
-    console.log('\nInstalling dependencies...');
-    if (process_1.exitCode === 0) {
-        const installProcess = spawn([packageManager, 'install'], {
-            cwd: projectName,
-            stdout: 'ignore',
-            stderr: 'inherit',
-        });
-
-        await installProcess.exited;
-        console.log('Dependencies installed successfully.');
-
-
-    }
-
-
-
+    await process.exited; // Wait for the process to exit
 }
 
-// Function to install React Router
-async function installReactRouter(projectName: string) {
-    console.log(`Installing React Router...`);
-
-    const process_1 = spawn([packageManager, 'add', 'react-router-dom'], {
-        cwd: projectName,
-        stdout: "ignore",
-        stderr: "inherit",
-    });
-
-    await process_1.exited;
-
-    console.log('React Router installed successfully.');
-}
-
-// Function to install Tailwind CSS
-async function installTailwind(projectName: string) {
+async function createViteApp(projectName: string) {
+    const spinner = ora('Creating Vite React app...').start();
     try {
-        console.log('Installing Tailwind CSS...');
+        await spawnProcess(['bun', 'create', 'vite', projectName, '--template', 'react-ts']);
+        spinner.succeed('Vite React app created');
 
-        // Install Tailwind and PostCSS
-        const installTailwindProcess = spawn([packageManager, 'add', '-D', 'tailwindcss', 'postcss', 'autoprefixer'], {
-            cwd: projectName,
-            stdout: 'ignore',
-            stderr: 'inherit',
-        });
+        spinner.start('Installing dependencies...');
+        await spawnProcess(['bun', 'install'], { cwd: projectName, });
+        spinner.succeed('Dependencies installed');
+    } catch (error) {
+        spinner.fail('Failed to create project');
+        throw error;
+    }
+}
 
-        await installTailwindProcess.exited;
+async function installReactRouter(projectName: string) {
+    const spinner = ora('Installing React Router...').start();
+    try {
+        await spawnProcess(['bun', 'add', 'react-router-dom'], { cwd: projectName });
+        spinner.succeed('React Router installed');
+    } catch (error) {
+        spinner.fail('Failed to install React Router');
+        throw error;
+    }
+}
 
-        // Initialize Tailwind CSS
-        const initTailwindProcess = spawn([packageRunner, 'tailwindcss', 'init', '-p'], {
-            cwd: projectName,
-            stdout: 'ignore',
-            stderr: 'inherit',
-        });
+async function installTailwind(projectName: string) {
+    const spinner = ora('Installing Tailwind CSS...').start();
+    try {
+        await spawnProcess(
+            ['bun', 'add', '-D', 'tailwindcss', 'postcss', 'autoprefixer'],
+            { cwd: projectName }
+        );
 
-        await initTailwindProcess.exited;
+        await spawnProcess(['npx', 'tailwindcss', 'init', '-p'], { cwd: projectName });
 
-        // Configure Tailwind content paths and basic CSS
-        const tailwindConfigPath = path.join(projectName, 'tailwind.config.js');
-        await writeFile(tailwindConfigPath, `
-module.exports = {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+        const tailwindConfig = `/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {},
   },
   plugins: [],
-};
-`, 'utf8');
+}`;
 
-        const cssPath = path.join(projectName, 'src', 'index.css');
-        await writeFile(cssPath, `
+        const cssContent = `
 @tailwind base;
 @tailwind components;
-@tailwind utilities;
-`, 'utf8');
-        const appCssPath = path.join(projectName, 'src', 'App.css');
-        await unlink(appCssPath);
-        console.log('Tailwind CSS initialized successfully.');
+@tailwind utilities;`;
 
+        await writeFile(path.join(projectName, 'tailwind.config.js'), tailwindConfig);
+        await writeFile(path.join(projectName, 'src/index.css'), cssContent);
+
+        const appCssPath = path.join(projectName, 'src/App.css');
+        if (existsSync(appCssPath)) {
+            await unlink(appCssPath);
+        }
+
+        spinner.succeed('Tailwind CSS installed and configured');
     } catch (error) {
-        console.error('Error:', error);
+        spinner.fail('Failed to install Tailwind CSS');
+        throw error;
     }
-
 }
 
-// Function to initialize React Router in App.tsx
 async function initReactRouter(projectName: string) {
-    console.log('Setting up basic React Router...');
-
-    const appJsPath = path.join(projectName, 'src', 'App.tsx');
-
-    const reactRouterTemplate = `
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+    const spinner = ora('Setting up React Router...').start();
+    try {
+        const routerTemplate = `import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 function Home() {
   return <h2>Home Page</h2>;
@@ -139,61 +114,78 @@ const router = createBrowserRouter([
 
 function App() {
   return (
-      <RouterProvider router={router} />
+    <RouterProvider router={router} />
   );
 }
 
-export default App;
-`;
+export default App;`;
 
-    await writeFile(appJsPath, reactRouterTemplate, 'utf8');
-
-    console.log('React Router initialized successfully.');
+        await writeFile(path.join(projectName, 'src/App.tsx'), routerTemplate);
+        spinner.succeed('React Router setup completed');
+    } catch (error) {
+        spinner.fail('Failed to setup React Router');
+        throw error;
+    }
 }
 
-// Function to handle CLI input and actionsasync function runCLI() {
-
-
 async function runCLI() {
-    console.log(chalk.bold('\n📦 Welcome to create-reactframe!\n'));
-
-    const spinner = ora();
+    console.log('\n📦 Welcome to create-reactframe!\n');
 
     try {
         const answers = await inquirer.prompt([
             {
                 type: 'input',
                 name: 'projectName',
-                message: chalk.blue('What is the name of your project?'),
+                message: 'What is the name of your project?',
                 default: 'my-app',
                 validate: (input: string) => {
-                    if (input.trim() === '') return 'Project name cannot be empty';
-                    if (existsSync(input)) return 'Directory already exists';
+                    if (input === '.') {
+                        return 'Creating a project in the current directory is not supported.';
+                    }
+                    if (existsSync(input)) {
+                        return 'Directory already exists. Please choose a different name.';
+                    }
                     return true;
                 }
             },
-            // ... other prompts
+            {
+                type: 'confirm',
+                name: 'useReactRouter',
+                message: 'Would you like to include React Router?',
+                default: true,
+            },
+            {
+                type: 'confirm',
+                name: 'useTailwind',
+                message: 'Would you like to include Tailwind CSS?',
+                default: true,
+            }
         ]);
 
-        spinner.start('Creating your project...');
-        await createViteApp(answers.projectName);
-        spinner.succeed('Project created');
+        const { projectName, useReactRouter, useTailwind } = answers;
 
-        spinner.start('Installing dependencies...');
-        // ... rest of your code
+        await createViteApp(projectName);
 
-        console.log(chalk.green('\n✨ Success! Created'), chalk.bold(answers.projectName), chalk.green('at'), chalk.bold(process.cwd()));
-        console.log('\nInside that directory, you can run:\n');
-        console.log(chalk.cyan('  npm run dev'));
-        console.log('    Starts the development server.\n');
-        console.log('Happy coding! 🎉\n');
+        if (useReactRouter) {
+            await installReactRouter(projectName);
+            await initReactRouter(projectName);
+        }
+
+        if (useTailwind) {
+            await installTailwind(projectName);
+        }
+
+        console.log('\n✅ Project setup completed successfully!');
+        console.log(`\nTo get started:\n`);
+        console.log(`  cd ${projectName}`);
+        console.log(`  bun run dev\n`);
     } catch (error) {
-        spinner.fail('Failed to create project');
-        console.error(error);
+        console.error('\nError:', error);
         process.exit(1);
     }
 }
 
 // Run the CLI
-runCLI().catch((err) => console.error('Error:', err));
+runCLI();
 
+export { createViteApp, installReactRouter, installTailwind, initReactRouter };
