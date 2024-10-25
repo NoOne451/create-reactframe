@@ -5,9 +5,11 @@ import { writeFile } from 'fs/promises';
 import path from 'path';
 import { unlink } from 'fs/promises';
 import { existsSync } from 'fs';
+import ora from 'ora';
+import chalk from 'chalk';
 
 // Function to determine runtime
-const isBun = process.argv[0].includes('bun');
+const isBun = process.argv[0].includes('bunx');
 const packageManager = isBun ? 'bun' : 'npm';
 const packageRunner = isBun ? 'bunx' : 'npx';
 
@@ -150,55 +152,45 @@ export default App;
 }
 
 // Function to handle CLI input and actionsasync function runCLI() {
+
+
 async function runCLI() {
+    console.log(chalk.bold('\n📦 Welcome to create-reactframe!\n'));
 
+    const spinner = ora();
 
-    const answers = await inquirer.prompt([
-        {
-            type: 'input',
-            name: 'projectName',
-            message: 'What is the name of your React project?',
-            default: 'my-app',
-        },
-        {
-            type: 'confirm',
-            name: 'useReactRouter',
-            message: 'Would you like to include React Router?',
-            default: true,
-        },
-        {
-            type: 'confirm',
-            name: 'useTailwind',
-            message: 'Would you like to include Tailwind CSS?',
-            default: true,
-        }
-    ]);
+    try {
+        const answers = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'projectName',
+                message: chalk.blue('What is the name of your project?'),
+                default: 'my-app',
+                validate: (input: string) => {
+                    if (input.trim() === '') return 'Project name cannot be empty';
+                    if (existsSync(input)) return 'Directory already exists';
+                    return true;
+                }
+            },
+            // ... other prompts
+        ]);
 
-    const { projectName, useReactRouter, useTailwind } = answers;
+        spinner.start('Creating your project...');
+        await createViteApp(answers.projectName);
+        spinner.succeed('Project created');
 
-    // Check if project name is "." or if the directory already exists
-    if (projectName === '.') {
-        console.log('Creating a project in the current directory is not supported yet. Please specify a different project name.');
+        spinner.start('Installing dependencies...');
+        // ... rest of your code
+
+        console.log(chalk.green('\n✨ Success! Created'), chalk.bold(answers.projectName), chalk.green('at'), chalk.bold(process.cwd()));
+        console.log('\nInside that directory, you can run:\n');
+        console.log(chalk.cyan('  npm run dev'));
+        console.log('    Starts the development server.\n');
+        console.log('Happy coding! 🎉\n');
+    } catch (error) {
+        spinner.fail('Failed to create project');
+        console.error(error);
         process.exit(1);
-    }
-
-    if (existsSync(projectName)) {
-        console.log(`The project directory "${projectName}" already exists. Please choose a different name.`);
-        process.exit(1);
-    }
-
-    // Create React app
-    await createViteApp(projectName);
-
-    // Conditionally install and set up React Router
-    if (useReactRouter) {
-        await installReactRouter(projectName);
-        await initReactRouter(projectName);
-    }
-
-    // Conditionally install and configure Tailwind CSS
-    if (useTailwind) {
-        await installTailwind(projectName);
     }
 }
 
